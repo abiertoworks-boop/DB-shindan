@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>設計書｜DRAGON BALL BUSINESS TYPE</title>
+<style>
+body{font:14px/1.7 "Noto Sans JP","Yu Gothic",sans-serif;max-width:1000px;margin:0 auto;padding:20px;color:#1b1d2a}
+h1{font-size:24px}h2{margin-top:36px;border-bottom:3px solid #ff9b1a;padding-bottom:4px}h3{margin-top:22px}
+table{border-collapse:collapse;width:100%;margin:8px 0;font-size:12.5px}th,td{border:1px solid #ccd;padding:4px 8px;vertical-align:top}th{background:#f1f2fa;text-align:left}
+code{background:#f1f2fa;padding:1px 5px;border-radius:4px}.s{color:#e08a00}.mut{color:#667}
+</style>
+<body>
+<h1>DRAGON BALL BUSINESS TYPE ― 設計書</h1>
+<p class="mut">この設計書は <code>data/*.js</code> から自動生成されています。データを直せばここも更新されます。</p>
+<div id="doc"></div>
+<script src="../data/config.js"></script><script src="../data/questions.js"></script>
+<script src="../data/characters.js"></script><script src="../data/combos.js"></script><script src="../js/engine.js"></script>
+<script>
+var D=DBT, L=D.paramLabels, E=D.engine, h="";
+function t(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;")}
+function sc(o,lab){return o?Object.keys(o).map(function(k){return (lab[k]||k)+"+"+o[k]}).join(" / "):"–"}
+function stars(n){return "<span class=s>"+"★".repeat(n)+"</span>"+"☆".repeat(5-n)}
+
+h+="<h2>0. 全体構造</h2><ul><li><b>データ</b>：<code>data/config.js</code>（調整値・UI文言・レア度基準）、<code>questions.js</code>（質問と選択肢スコア）、<code>characters.js</code>（表10・裏20）、<code>combos.js</code>（作り込み済み組み合わせ文章）</li><li><b>ロジック</b>：<code>js/engine.js</code>（UI非依存の純関数）</li><li><b>UI</b>：<code>index.html</code> / <code>css/style.css</code> / <code>js/app.js</code> / <code>js/share.js</code></li><li><b>検証</b>：<code>tools/simulate.html</code>（ランダム回答10万件の分布確認）</li></ul>";
+
+h+="<h2>1. 10問の選択肢と内部スコア</h2>";
+D.questions.forEach(function(q){
+  h+="<h3>"+q.id+"（"+(q.phase==="main"?"表":"裏")+"）"+t(q.text)+"</h3><table><tr><th>選択肢</th><th>表スコア</th><th>裏スコア</th></tr>";
+  q.options.forEach(function(o,i){h+="<tr><td>"+"ABCDE"[i]+". "+t(o.label)+"</td><td>"+sc(o.main,L.main)+"</td><td>"+sc(o.sub,L.sub)+"</td></tr>"});
+  h+="</table>";
+});
+
+h+="<h2>2. メイン10キャラへの判定ロジック</h2><p>各パラメータ合計を「その質問群で取りうる最大値」で割って0〜1に正規化し、キャラごとの重み(profile)で加重平均 → 最高スコアが表キャラ候補。1対1判定ではなく、10問の総合です。</p><table><tr><th>キャラ</th><th>交流タイプ</th><th>重み(profile)</th><th>axes(open/heart/power)</th></tr>";
+D.mainChars.forEach(function(c){h+="<tr><td>"+c.name+"</td><td>"+c.type+"</td><td>"+sc(c.profile,L.main)+"</td><td>"+[c.axes.open,c.axes.heart,c.axes.power].join(" / ")+"</td></tr>"});
+h+="</table><p class=mut>正規化の最大値：" +sc(E.maxPossible("main"),L.main)+"</p>";
+
+h+="<h2>3. サブ20キャラへの判定ロジック</h2><p>表と同じ方式で裏スコアから算出。</p><table><tr><th>キャラ</th><th>テーマ</th><th>重み(profile)</th><th>axes</th><th>裏の一言</th></tr>";
+D.subChars.forEach(function(c){h+="<tr><td>"+c.name+"</td><td>"+c.theme+"</td><td>"+sc(c.profile,L.sub)+"</td><td>"+[c.axes.open,c.axes.heart,c.axes.power].join(" / ")+"</td><td>"+c.hidden+"</td></tr>"});
+h+="</table><p class=mut>正規化の最大値：" +sc(E.maxPossible("sub"),L.sub)+"</p>";
+
+var s=D.config.selection;
+h+="<h2>4. メイン×サブの組み合わせルール</h2><ol><li>表スコア上位"+s.mainCandidates+"人 × 裏スコア上位"+s.subCandidates+"人を候補にする（1位との差が表"+s.maxMainDrop+"・裏"+s.maxSubDrop+"以内のみ。回答との乖離防止）</li><li>各候補の合計点 = 表スコア + 裏スコア + 星ボーナス(<b>"+s.gapBonus+" × (星−2)</b>) + 作り込み済みボーナス("+s.curatedBonus+") − 同一キャラ減点("+s.samePenalty+")</li><li>最高点の組み合わせを採用。→ 意味のあるギャップは優遇、悟空×悟空のような同質組は実質出ない</li><li>回答に忠実であることを優先し、無理な逆属性化はしない（ボーナスは小さく、乖離上限あり）</li></ol>";
+
+var r=D.config.rarity;
+h+="<h2>5. レア度算出ルール</h2><p>キャラ単体ではなく<b>表×裏の組み合わせ</b>で決定。<code>combos.js</code>に星指定があればそれを優先、無ければ axes の距離（|open差|+|heart差|+|power差|、最大12）で算出。</p><table><tr><th>星</th><th>意味</th><th>自動算出の距離</th></tr>";
+[5,4,3,2].forEach(function(n){var th=r.thresholds.filter(function(x){return x.stars===n})[0];h+="<tr><td>"+stars(n)+"</td><td>"+r.labels[n]+"</td><td>≥ "+th.min+"</td></tr>"});
+h+="</table><p>星は能力の高さではなく、表と裏の組み合わせの珍しさです。</p>";
+
+var keys=Object.keys(D.combos);
+h+="<h2>6〜9. タイプ名・必殺技・強み・注意点</h2><p><b>作り込み済み "+keys.length+" 組</b>（下表）＋ <b>残り "+(200-keys.length)+" 組は自動合成</b>：</p><ul><li>タイプ名 = 表の<code>lead</code> + 裏の<code>noun</code>（例：穏やかで誠実な好奇心の塊）</li><li>必殺技 = 表の<code>moveA</code> + 「ようで、」+ 裏の<code>moveB</code></li><li>強み = 表の<code>strength</code> + 裏の<code>strength</code></li><li>注意点 = 表の<code>caution</code> + 「また、」+ 裏の<code>caution</code></li><li>まとめ = 「表では…。でも裏では…。」</li></ul><table><tr><th>表×裏</th><th>星</th><th>タイプ名</th><th>必殺技</th><th>強み</th><th>注意点</th></tr>";
+keys.forEach(function(k){var c=D.combos[k],p=k.split("-"),m=E.byId(D.mainChars,p[0]),sb=E.byId(D.subChars,p[1]);
+h+="<tr><td>"+m.name+" × "+sb.name+"</td><td>"+stars(c.stars)+"</td><td>"+c.name+"</td><td>「"+c.move+"」</td><td>"+c.strength+"</td><td>"+c.caution+"</td></tr>"});
+h+="</table>";
+h+="<h3>自動合成の例（3件）</h3><table>";
+[["gohan","tien"],["krillin","buu"],["satan","cell"]].forEach(function(p){var x=E.buildResult(p[0],p[1]);h+="<tr><td>"+x.main.name+" × "+x.sub.name+" "+stars(x.stars)+"</td><td>"+x.typeName+"<br>「"+x.move+"」</td><td>"+x.strength+"<br>"+x.caution+"</td></tr>"});
+h+="</table>";
+document.getElementById("doc").innerHTML=h;
+</script>

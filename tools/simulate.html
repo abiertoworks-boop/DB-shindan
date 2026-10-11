@@ -1,0 +1,32 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>診断ロジック シミュレーション</title>
+<style>body{font:13px/1.5 monospace;padding:12px}</style>
+<pre id="out">running…</pre>
+<script src="../data/config.js"></script>
+<script src="../data/questions.js"></script>
+<script src="../data/characters.js"></script>
+<script src="../data/combos.js"></script>
+<script src="../js/engine.js"></script>
+<script>
+// ランダム回答を N 件流して、分布の偏り・到達不能キャラを確認する開発用ツール
+var N = 100000, D = DBT;
+var mainCnt = {}, subCnt = {}, pairCnt = {}, starCnt = {}, cur = 0, same = 0;
+D.mainChars.forEach(c => mainCnt[c.id] = 0);
+D.subChars.forEach(c => subCnt[c.id] = 0);
+for (var i = 0; i < N; i++) {
+  var a = D.questions.map(q => Math.floor(Math.random() * q.options.length));
+  var r = D.engine.diagnose(a);
+  mainCnt[r.main.id]++; subCnt[r.sub.id]++;
+  var k = r.main.id + "-" + r.sub.id; pairCnt[k] = (pairCnt[k] || 0) + 1;
+  starCnt[r.stars] = (starCnt[r.stars] || 0) + 1;
+  if (r.curated) cur++;
+  if (r.main.id === r.sub.id) same++;
+}
+function pct(o) { return Object.keys(o).sort((a,b)=>o[b]-o[a]).map(k => k + " " + (o[k]/N*100).toFixed(1) + "%").join("\n"); }
+var pairs = Object.keys(pairCnt).length;
+document.getElementById("out").textContent =
+  "MAIN\n" + pct(mainCnt) + "\n\nSUB\n" + pct(subCnt) + "\n\nSTARS\n" + pct(starCnt) +
+  "\n\ncurated rate " + (cur/N*100).toFixed(1) + "%  same-char " + (same/N*100).toFixed(2) + "%  distinct pairs " + pairs + "/200\n" +
+  "\nTOP PAIRS\n" + Object.keys(pairCnt).sort((a,b)=>pairCnt[b]-pairCnt[a]).slice(0,15).map(k=>k+" "+(pairCnt[k]/N*100).toFixed(1)+"%").join("\n");
+</script>
