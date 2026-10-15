@@ -116,6 +116,7 @@
         var hit = search(mainRank, subRank, t.main, t.sub, t.mainDrop, t.subDrop, true);
         if (hit) return hit;
       }
+      return search(mainRank, subRank, 10, 20, 1, 1, true); // 画像付きカードのみ出す（画像なしの組は選ばない）
     }
     return search(mainRank, subRank, sel.mainCandidates, sel.subCandidates, sel.maxMainDrop, sel.maxSubDrop, false);
   }
