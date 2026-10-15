@@ -83,24 +83,41 @@
     };
   }
 
-  /* 表候補×裏候補から、回答との整合とギャップの面白さで最良の組を選ぶ */
-  function pickPair(mainRank, subRank) {
-    var sel = D.config.selection;
-    var mTop = mainRank[0].score, sTop = subRank[0].score;
-    var best = null;
-    mainRank.slice(0, sel.mainCandidates).forEach(function (m) {
-      if (mTop - m.score > sel.maxMainDrop) return;
-      subRank.slice(0, sel.subCandidates).forEach(function (s) {
-        if (sTop - s.score > sel.maxSubDrop) return;
-        var stars = starsFor(m.id, s.id);
-        var total = m.score + s.score
-          + sel.gapBonus * (stars - 2)
-          + (D.combos[m.id + "-" + s.id] ? sel.curatedBonus : 0)
-          - (m.id === s.id ? sel.samePenalty : 0);
+  function pairScore(m, s, sel) {
+    var stars = starsFor(m.id, s.id);
+    return m.score + s.score + sel.gapBonus * (stars - 2)
+      + (D.combos[m.id + "-" + s.id] ? sel.curatedBonus : 0)
+      - (m.id === s.id ? sel.samePenalty : 0);
+  }
+
+  function search(mainRank, subRank, mainN, subN, mainDrop, subDrop, needImage) {
+    var sel = D.config.selection, mTop = mainRank[0].score, sTop = subRank[0].score, best = null;
+    mainRank.slice(0, mainN).forEach(function (m) {
+      if (mTop - m.score > mainDrop) return;
+      subRank.slice(0, subN).forEach(function (s) {
+        if (sTop - s.score > subDrop) return;
+        var c = D.combos[m.id + "-" + s.id];
+        if (needImage && !(c && c.image)) return;
+        var total = pairScore(m, s, sel);
         if (!best || total > best.total) best = { main: m.id, sub: s.id, total: total };
       });
     });
     return best;
+  }
+
+  /* 表候補×裏候補から、回答との整合とギャップの面白さで最良の組を選ぶ。
+     requireImage=true のときは、結果カード画像のある組み合わせを優先して探し、
+     段階的に候補を広げる（見つからなければ画像なしの組にフォールバック） */
+  function pickPair(mainRank, subRank) {
+    var sel = D.config.selection;
+    if (sel.requireImage) {
+      for (var i = 0; i < sel.imageTiers.length; i++) {
+        var t = sel.imageTiers[i];
+        var hit = search(mainRank, subRank, t.main, t.sub, t.mainDrop, t.subDrop, true);
+        if (hit) return hit;
+      }
+    }
+    return search(mainRank, subRank, sel.mainCandidates, sel.subCandidates, sel.maxMainDrop, sel.maxSubDrop, false);
   }
 
   function diagnose(answers) {

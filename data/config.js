@@ -16,7 +16,13 @@
       maxSubDrop: 0.15,
       gapBonus: 0.04,      // 星が1つ増えるごとの加点（ギャップのある組み合わせを優遇）
       curatedBonus: 0.02,  // 文章を個別に作り込んだ組み合わせへの加点
-      samePenalty: 0.5     // 表と裏が同一キャラの場合の減点（実質回避）
+      samePenalty: 0.5,    // 表と裏が同一キャラの場合の減点（実質回避）
+      requireImage: true,  // 結果カード画像のある組み合わせを優先して選ぶ（画像が全結果に出るように）
+      imageTiers: [        // 画像付きの組が見つかるまで候補を段階的に広げる
+        { main: 3, sub: 4, mainDrop: 0.12, subDrop: 0.15 },
+        { main: 4, sub: 8, mainDrop: 0.2, subDrop: 0.3 },
+        { main: 10, sub: 20, mainDrop: 1, subDrop: 1 }
+      ]
     },
 
     /* レア度：表キャラと裏キャラの axes（open/heart/power）の距離で自動算出。
